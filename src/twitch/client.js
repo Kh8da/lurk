@@ -217,9 +217,10 @@ class TwitchClient {
       }
       if (!body) throw new Error(`Twitch GQL answered ${res.status}`);
       const list = Array.isArray(body) ? body : [body];
+      const sent = [].concat(ops);
       let retry = false;
-      let stale = false;
-      for (const r of list) {
+      const stale = [];
+      for (const [i, r] of list.entries()) {
         if (!r) continue;
         if (r.error) {
           if (r.status === 401 || /unauthorized/i.test(r.error)) throw new AuthError();
@@ -235,7 +236,8 @@ class TwitchClient {
           } else if (RETRYABLE.has(msg)) {
             retry = true;
             if (this.logger) this.logger.warn('twitch', `${(r.extensions && r.extensions.operationName) || 'gql'}: ${msg}, retrying`);
-            if (msg === 'PersistedQueryNotFound') stale = true;
+            const o = sent[i];
+            if (msg === 'PersistedQueryNotFound' && o && o.extensions) stale.push({ name: o.operationName, hash: o.extensions.persistedQuery.sha256Hash });
           } else if (/^unauthorized$/i.test(msg) || /authorization.*token is invalid/i.test(msg)) {
             throw new AuthError();
           } else {
@@ -245,16 +247,16 @@ class TwitchClient {
         }
       }
       if (!retry) return body;
-      if (stale && attempt >= 1) {
-        // Twitch rotated a query hash: fetch the current ones and retry with them.
-        const changed = await hashes.refresh();
-        if (this.logger) this.logger.warn('twitch', `query hashes refreshed, ${changed.length} changed: ${changed.join(', ') || 'none'}`);
-        for (const o of [].concat(ops)) {
+      if (stale.length && attempt >= 1) {
+        // Twitch rotated a query hash: look up the current one and retry with it.
+        const changed = await hashes.repair(stale);
+        if (this.logger) this.logger.warn('twitch', `query hashes repaired, ${changed.length} changed: ${changed.join(', ') || 'none'}`);
+        for (const o of sent) {
           const fresh = o.extensions && hashes.get(o.operationName);
           if (fresh) o.extensions.persistedQuery.sha256Hash = fresh;
         }
         if (!changed.length && attempt >= 2) {
-          const names = [...new Set([].concat(ops).map((o) => o.operationName))].join(', ');
+          const names = [...new Set(stale.map((o) => o.name))].join(', ');
           throw new Error(`Twitch changed how ${names} works and no fix is out yet. Lurk checks again in 30 minutes.`);
         }
       }

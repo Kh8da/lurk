@@ -1,7 +1,7 @@
 {
   "name": "lurk",
   "productName": "Lurk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Watches Twitch for you and claims the drops",
   "author": "Kh8da",
   "main": "main.js",

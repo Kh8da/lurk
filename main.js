@@ -56,7 +56,7 @@ function onCrash(where, err) {
   log.error('crash', `${where}: ${(err && err.stack) || err}`);
   if (!reports || !settings) return;
   reports.crash(settings.values.crashReports, {
-    error: redact(`${where}: ${(err && err.stack) || err}`).slice(0, 20000),
+    error: stripNames(redact(`${where}: ${(err && err.stack) || err}`)).slice(0, 20000),
     summary: appSummary(),
     logs: stripNames(log.tail(300)),
   });
@@ -102,7 +102,7 @@ function boot() {
   });
 
   hashes.init(store);
-  if (!DEMO && hashes.stale()) hashes.refresh();
+  if (!DEMO && hashes.stale()) hashes.fetch();
   gaming = new Gaming();
   gaming.on('change', () => { applyHold(); push(); });
   if (settings.values.pauseWhileGaming) gaming.start();
@@ -515,7 +515,7 @@ function appSummary() {
       autopilot: a.engine.autopilot,
       queue: a.engine.queue.length,
       campaigns: a.engine.campaigns.size,
-      lastError: a.engine.error,
+      lastError: a.engine.error && stripNames(String(a.engine.error)),
     })),
     settings: { ...v, favorites: v.favorites.length, skipGames: v.skipGames.length },
     telegram: telegram.status().connected,
@@ -527,15 +527,24 @@ function appSummary() {
 
 const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// Swap every account's Twitch name for "account-1", "account-2" and so on.
+// Swap every account's Twitch name for "account-1", "account-2" and so on,
+// and the Windows user folder (it carries the PC's user name) for %USERPROFILE%.
 function stripNames(text) {
-  let out = text;
+  let out = hideHome(String(text));
+  if (!accounts) return out;
   accounts.list().forEach((a, i) => {
     for (const name of new Set([a.login, a.displayName].filter((n) => n && n.length > 2))) {
       out = out.replace(new RegExp(escapeRe(name), 'gi'), `account-${i + 1}`);
     }
   });
   return out;
+}
+
+function hideHome(text) {
+  const home = require('os').homedir();
+  if (!home || home.length < 4) return text;
+  const pattern = escapeRe(home).replace(/\\\\/g, '[\\\\/]+');
+  return text.replace(new RegExp(pattern, 'gi'), '%USERPROFILE%');
 }
 
 function buildReport({ description, contact, includeNames, includeLogs }) {
@@ -545,7 +554,7 @@ function buildReport({ description, contact, includeNames, includeLogs }) {
     contact: String(contact || '').slice(0, 200),
     accounts: includeNames ? accounts.list().map((a) => a.login) : null,
     summary: appSummary(),
-    logs: logs && (includeNames ? logs : stripNames(logs)),
+    logs: logs && (includeNames ? hideHome(logs) : stripNames(logs)),
   };
 }
 

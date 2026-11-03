@@ -1,6 +1,8 @@
 'use strict';
 // Alerts through the user's own Telegram bot. Connecting: paste the bot token,
-// send the bot any message, and the chat it came from becomes the target.
+// then send the bot the one-time code Lurk shows. Only the chat that sends that
+// code becomes the target, so someone else who finds the bot first can't claim it.
+const crypto = require('crypto');
 const { request } = require('./http');
 
 const TOKEN_RE = /^\d{5,}:[A-Za-z0-9_-]{30,}$/;
@@ -15,7 +17,7 @@ class Telegram {
     this.token = saved.token || null;
     this.chatId = saved.chatId || null;
     this.bot = saved.bot || null;
-    this.pending = null; // { bot } while waiting for the first message
+    this.pending = null; // { bot, code } while waiting for the code
     this.error = null;
     this.run = 0;
   }
@@ -24,8 +26,9 @@ class Telegram {
     return {
       connected: !!(this.token && this.chatId),
       bot: this.bot,
-      // null: idle. '': checking the token. 'name': waiting for a message to @name.
+      // null: idle. '': checking the token. 'name': waiting for the code at @name.
       pending: this.pending ? this.pending.bot || '' : null,
+      code: this.pending ? this.pending.code || null : null,
       error: this.error,
     };
   }
@@ -50,18 +53,29 @@ class Telegram {
     try {
       const me = await this.api('getMe', {}, token);
       if (run !== this.run) return;
-      this.pending = { bot: me.username };
+      const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+      this.pending = { bot: me.username, code };
       this.onChange();
       // Skip anything sent to the bot before this moment.
       const old = await this.api('getUpdates', { timeout: 0 }, token);
       let offset = old.length ? old[old.length - 1].update_id + 1 : 0;
-      const until = Date.now() + 3 * 60 * 1000;
+      const until = Date.now() + 5 * 60 * 1000;
+      const hinted = new Set();
       while (run === this.run && Date.now() < until) {
         const updates = await this.api('getUpdates', { offset, timeout: 20 }, token, 30000);
         for (const u of updates) {
           offset = u.update_id + 1;
-          const msg = u.message || u.edited_message;
+          const msg = u.message;
           if (!msg || !msg.chat || run !== this.run) continue;
+          // "/start 123456" from the Open in Telegram link, or the code typed by hand.
+          const sent = String(msg.text || '').replace(/^\/start(@\w+)?/i, '').replace(/[\s-]/g, '');
+          if (sent !== code) {
+            if (!hinted.has(msg.chat.id)) {
+              hinted.add(msg.chat.id);
+              await this.api('sendMessage', { chat_id: msg.chat.id, text: 'Send the 6-digit code Lurk shows you.' }, token).catch(() => {});
+            }
+            continue;
+          }
           this.token = token;
           this.chatId = msg.chat.id;
           this.bot = me.username;
@@ -71,7 +85,7 @@ class Telegram {
           return;
         }
       }
-      if (run === this.run) throw new Error(`No message reached @${me.username}. Send it any message, then connect again.`);
+      if (run === this.run) throw new Error(`The code never reached @${me.username}. Connect again for a new one.`);
     } catch (err) {
       if (run === this.run) this.error = err.message;
       throw err;

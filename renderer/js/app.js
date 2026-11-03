@@ -313,14 +313,28 @@ function TelegramCard({ tg }) {
       </div>`;
   }
   if (tg.pending !== null) {
+    if (!tg.pending || !tg.code) {
+      return html`
+        <div class="tg">
+          <span class="tg-icon"><i class="spinner" /></span>
+          <div class="tg-meta"><div class="tg-title">Checking the token</div><div class="tg-sub">One moment</div></div>
+          <button class="link-btn" onClick=${() => api.telegram.cancel()}>Cancel</button>
+        </div>`;
+    }
     return html`
-      <div class="tg">
-        <span class="tg-icon"><i class="spinner" /></span>
-        <div class="tg-meta">
-          <div class="tg-title">${tg.pending ? html`Now message <b>@${tg.pending}</b>` : 'Checking the token'}</div>
-          <div class="tg-sub">${tg.pending ? 'Open your bot in Telegram and send it anything, like "hi".' : 'One moment'}</div>
+      <div class="tg form">
+        <div class="tg-row">
+          <span class="tg-icon"><i class="spinner" /></span>
+          <div class="tg-meta">
+            <div class="tg-title">Send <b>@${tg.pending}</b> this code</div>
+            <div class="tg-sub">Only the chat that sends it gets your alerts and can control Lurk.</div>
+          </div>
+          <button class="link-btn" onClick=${() => api.telegram.cancel()}>Cancel</button>
         </div>
-        <button class="link-btn" onClick=${() => api.telegram.cancel()}>Cancel</button>
+        <div class="tg-code">
+          <span class="mono">${tg.code.slice(0, 3)} ${tg.code.slice(3)}</span>
+          <button class="btn primary sm" onClick=${() => api.open(`https://t.me/${tg.pending}?start=${tg.code}`)}>Open in Telegram</button>
+        </div>
       </div>`;
   }
   return html`
@@ -332,7 +346,7 @@ function TelegramCard({ tg }) {
       <ol class="tg-steps">
         <li>In Telegram, message <b>@BotFather</b> and send <span class="mono">/newbot</span>.</li>
         <li>Paste the token it gives you below and hit Connect.</li>
-        <li>Send your new bot any message.</li>
+        <li>Send your new bot the code Lurk shows you.</li>
       </ol>
       <div class="tg-input">
         <input type="password" placeholder="Bot token" value=${token} onInput=${(e) => setToken(e.currentTarget.value)} spellcheck="false" autocomplete="off" />
