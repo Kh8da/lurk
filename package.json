@@ -1,0 +1,87 @@
+{
+  "name": "lurk",
+  "productName": "Lurk",
+  "version": "0.5.0",
+  "description": "Watches Twitch for you and claims the drops",
+  "author": "Kh8da",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "demo:login": "electron . --demo=login",
+    "icon": "node tools/make-icon.js",
+    "dist": "electron-builder --win --x64",
+    "pack": "electron-builder --win --x64 --dir",
+    "release": "node tools/release.js",
+    "test": "node --test --test-reporter=spec test/*.test.js"
+  },
+  "devDependencies": {
+    "electron": "^44.10.1",
+    "electron-builder": "^26.15.3",
+    "htm": "^3.1.1",
+    "wrangler": "^4.149.0"
+  },
+  "build": {
+    "appId": "app.lurk",
+    "productName": "Lurk",
+    "copyright": "Copyright © 2026 Kh8da",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "artifactName": "Lurk-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Lurk",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false
+    },
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://pub-cbce00e549bc451ab552fe28377341c2.r2.dev"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kh8da/lurk.git"
+  },
+  "homepage": "https://github.com/Kh8da/lurk"
+}

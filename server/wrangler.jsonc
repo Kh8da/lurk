@@ -1,0 +1,16 @@
+// Lurk report server. Deploy from the Lurk folder:
+//   npx wrangler deploy --config server/wrangler.jsonc
+// The admin key is a secret: npx wrangler secret put ADMIN_KEY --config server/wrangler.jsonc
+{
+  "name": "lurk-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lurk", "database_id": "c2424b3b-f43c-42d8-837a-2697f3b23cab" }
+  ],
+  "r2_buckets": [
+    { "binding": "LOGS", "bucket_name": "lurk-reports" }
+  ],
+  "triggers": { "crons": ["17 4 * * *"] },
+  "observability": { "enabled": true }
+}
